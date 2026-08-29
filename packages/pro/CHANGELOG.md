@@ -1,5 +1,23 @@
 # @docx-editor.dev/pro
 
+## 2.13.0
+
+### Patch Changes
+
+- 66fcc36: Two people formatting the same paragraph at once no longer duplicate its text. A concurrent run-property edit now converges deterministically — one peer's formatting wins and the text stays intact — instead of silently doubling it on every replica. Fixes #581.
+- Updated dependencies [3c66a7c]
+- Updated dependencies [2ea6a9d]
+- Updated dependencies [0860dd2]
+- Updated dependencies [b1fa0d6]
+- Updated dependencies [f1d3940]
+- Updated dependencies [0a6e44c]
+- Updated dependencies [72ff41f]
+- Updated dependencies [8506a62]
+- Updated dependencies [7e85377]
+  - @docx-editor.dev/core@2.13.0
+  - @docx-editor.dev/react@2.13.0
+  - @docx-editor.dev/vue@2.13.0
+
 ## 2.12.0
 
 ### Minor Changes

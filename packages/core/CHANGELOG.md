@@ -1,5 +1,23 @@
 # @docx-editor.dev/core
 
+## 2.13.0
+
+### Minor Changes
+
+- 3c66a7c: The font-substitution notice now reports only families that rendered text resolves to through the style cascade, so declarations in unused styles no longer trigger it. Adds `renderedFontFamilies()` to the tree session.
+- 2ea6a9d: Saving now refreshes stale REF field results inside footnotes and endnotes as one undoable transaction with the body, so the exported note parts carry the values the pages paint; a field inside a locked or data-bound content control keeps its cached result without blocking the others, and collaborative sessions keep exporting cached results. Fixes #611
+- 0860dd2: Let a font substitution carry the requested family's line box through `FontSourceSubstitution.lineMetrics`, so a substitute with different vertical metrics still paginates like the face the document names.
+- b1fa0d6: REF cross-reference fields now compute their results live from the bookmark target and the resolved numbering, so references such as "Section 1.2" track renumbering edits instead of painting the saved result forever. Fixes #601.
+- f1d3940: Saving now rewrites stale REF field results into the exported bytes, and REF fields inside footnotes and endnotes paint live values. Fixes #606.
+
+### Patch Changes
+
+- 0a6e44c: Resolve the REF `\t` switch and NOTEREF fields live from the document's numbering, so those references track edits instead of painting stale cached results. Fixes #612.
+- 72ff41f: Footnotes taller than the remaining page now start on their reference page, share it correctly with other references, and release their space when drained, so footnote-heavy documents paginate at the correct density. A `w:cantSplit` table row taller than the band a footnote reserve leaves now takes the full page instead of failing the layout. Fixes #608.
+- 8506a62: Numbered paragraphs now inherit the list id through the style chain when a style sets only the level, so multilevel heading numbering in legal templates renders. Fixes #600.
+- 7e85377: Declare the Node floor the text shaper needs (`^20.16.0 || >=22.3.0`) so an installer reports it before a run fails. Fixes #595.
+- @docx-editor.dev/i18n@2.13.0
+
 ## 2.12.0
 
 ### Minor Changes
