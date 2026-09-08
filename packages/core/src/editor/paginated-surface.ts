@@ -7,6 +7,7 @@ import { formsProtectionEnabled, sectionProtectsForms } from '@docx-editor.dev/c
 
 /* eslint-disable max-lines -- composition root; seams live in surface-*.ts */
 
+import { isRevisionCapable, isTrackedEdit } from './surface-tracked-ops.ts';
 import { isMissingAuthorRefusal } from './docx-editor-author.ts';
 import {
   openTreeSession,
@@ -3058,38 +3059,6 @@ export function mountPaginatedSurface(
    * permanent edit with no card, nothing to reject, and — once formatting learned to reach
    * tracked text — a silent rewrite of another author's pending insertion (#495).
    */
-  type RevisionCapableOp = Extract<
-    TreeDocOp,
-    {
-      op:
-        | 'insertText'
-        | 'deleteText'
-        | 'insertTab'
-        | 'insertHardBreak'
-        | 'insertPageBreak'
-        | 'insertPageField'
-        | 'insertNote'
-        | 'insertTableRow'
-        | 'deleteTableRow'
-        | 'setRunProperties'
-        | 'setParagraphProperties'
-        | 'setParagraphMarkProperties';
-    }
-  >;
-  const REVISION_CAPABLE_OPS: ReadonlySet<TreeDocOp['op']> = new Set<RevisionCapableOp['op']>([
-    'insertText',
-    'deleteText',
-    'insertTab',
-    'insertHardBreak',
-    'insertPageBreak',
-    'insertPageField',
-    'insertNote',
-    'insertTableRow',
-    'deleteTableRow',
-    'setRunProperties',
-    'setParagraphProperties',
-    'setParagraphMarkProperties',
-  ]);
 
   /**
    * Whether this op's tracked form is a PROPERTY CHANGE record.
@@ -3107,25 +3076,6 @@ export function mountPaginatedSurface(
 
   /** Whether this document wants its formatting changes recorded at all. */
   const formattingTracked = (): boolean => !session.trackingSettings().doNotTrackFormatting;
-  function isRevisionCapable(op: TreeDocOp): op is RevisionCapableOp {
-    return REVISION_CAPABLE_OPS.has(op.op);
-  }
-
-  function isTrackedEdit(op: TreeDocOp): boolean {
-    if (isRevisionCapable(op)) return op.revision !== undefined;
-    switch (op.op) {
-      case 'setParagraphMarkRevision':
-      case 'proposeParagraphMerge':
-        return true;
-      // Paste proposes its breaks through the op itself, so a paste of newlines alone is a
-      // tracked edit with no `insertText` beside it to report for it.
-      case 'splitParagraphMany':
-        return op.revision !== undefined;
-      default:
-        return false;
-    }
-  }
-
   function attributeTrackedOps(
     ops: readonly TreeDocOp[],
     revision: import('../store/store/tree-op-types.ts').RevisionAttributionInput,
@@ -5314,6 +5264,14 @@ export function mountPaginatedSurface(
               rejected: true,
               opCount: 0,
               reason: refused ?? 'this engine will not author that hyperlink target',
+            });
+          }
+          if (!options.reviewModel && ops.some(isTrackedEdit)) {
+            return (result = {
+              committed: false,
+              rejected: true,
+              opCount: 0,
+              reason: 'review-module-required',
             });
           }
           return (result = applyOps(ops, undefined, undefined, story, false));
