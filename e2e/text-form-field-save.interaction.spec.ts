@@ -123,3 +123,88 @@ test('autosave from a change callback preserves the caret through undo', async (
   await expect(page.locator('.docx-pages')).toBeFocused();
   await page.evaluate(() => window.__dateSave.destroy());
 });
+
+for (const path of ['detach', 'move', 'automation'] as const) {
+  for (const input of ['03/04/2030', 'invalid']) {
+    test(`${path} save preserves typed form input: ${input}`, async ({ page }) => {
+      await openDateField(page);
+      await page.keyboard.insertText(input);
+      const result = await page.evaluate(
+        async ({ path, root }) => {
+          const editor = window.__dateSave;
+          editor.setLocale('en-US');
+          let errorCode: string | undefined;
+          let bytes: Uint8Array | undefined;
+          if (path === 'automation') {
+            const { createBrowserAutomationHost } = await import(
+              `${root}/packages/core/src/editor/automation-host.ts`
+            );
+            const host = createBrowserAutomationHost(editor);
+            const saved = host.save();
+            if (saved.ok) bytes = saved.bytes;
+            else errorCode = saved.error.code;
+            host.dispose();
+          } else {
+            const container = document.createElement('div');
+            document.body.append(container);
+            if (path === 'detach') editor.detach();
+            editor.attach(container);
+            try {
+              bytes = new Uint8Array(await editor.save());
+            } catch (error) {
+              errorCode = (error as { code?: string }).code;
+            }
+          }
+          if (bytes) editor.load(bytes);
+          const text = editor.surface!.session.bodyText();
+          const dialogs = document.querySelectorAll('dialog').length;
+          editor.destroy();
+          return { text, errorCode, dialogs };
+        },
+        { path, root: `/@fs/${resolve(import.meta.dirname, '..')}` }
+      );
+      expect(result).toEqual(
+        input === 'invalid'
+          ? {
+              text: 'invalid tail',
+              errorCode: path === 'automation' ? 'transaction-refused' : 'invalidArgs',
+              dialogs: 0,
+            }
+          : { text: '04/03/2030 tail', errorCode: undefined, dialogs: 0 }
+      );
+    });
+  }
+}
+
+for (const throws of [false, true]) {
+  test(`field-exit callback remount preserves date input (throws: ${throws})`, async ({ page }) => {
+    await openDateField(page);
+    await page.keyboard.insertText('03/04/2030');
+    const result = await page.evaluate(async (throws) => {
+      const editor = window.__dateSave;
+      const container = document.body.firstElementChild as HTMLElement;
+      const paragraphId = editor.surface!.session.paragraphIds()[0]!;
+      const off = editor.on('change', () => {
+        off();
+        editor.detach();
+        editor.attach(container);
+        if (throws) throw new Error('host callback');
+      });
+      let caught = false;
+      try {
+        editor.surface!.setSelection({
+          anchor: { paragraphId, offset: 13 },
+          head: { paragraphId, offset: 13 },
+        });
+      } catch {
+        caught = true;
+      }
+      const bytes = await editor.save();
+      editor.load(bytes);
+      const text = editor.surface!.session.bodyText();
+      editor.destroy();
+      return { caught, text };
+    }, throws);
+    expect(result).toEqual({ caught: throws, text: '04/03/2030 tail' });
+  });
+}
